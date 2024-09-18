@@ -191,7 +191,6 @@ router.delete("/:pid", (req, res) => {
 
   fs.writeFileSync("src/productos.json", JSON.stringify(products));
 
-  res.status(201).send("Producto eliminado con exito");
-});
+  return res.status(200).json({ success: true, message: "Producto eliminado con éxito", products });});
 
 export default router;
