@@ -4,16 +4,25 @@ import carts from "./routes/cart.js";
 import __dirname from "./utils.js";
 import handlebars from "express-handlebars";
 import viewsRouter from "./routes/views.js";
-import fs from "fs";
+import mongoose from 'mongoose';
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
+import { productModel } from "./models/products.js";
 
 const app = express();
 const server = createServer(app);
 const io = new SocketIOServer(server);
 
 app.use(express.static(__dirname + "/public"));
-app.engine("handlebars", handlebars.engine());
+// app.engine("handlebars", handlebars.engine());
+
+app.engine('handlebars', handlebars.engine({
+  helpers: {
+      multiply: (a, b) => a * b
+  }
+}))
+
+
 app.set("views", __dirname + "/views");
 app.set("view engine", "handlebars");
 
@@ -31,6 +40,8 @@ app.use("/api/carts", carts);
 app.use("/", viewsRouter);
 app.use("/realtimeproducts", viewsRouter);
 
+const conection = mongoose.connect('mongodb+srv://Comision70200:comision70200@chproject.mk8ag.mongodb.net/Proyecto-Final').then(() => console.log("Conectado a MongoDB")).catch(err => console.error("Error de conexión a MongoDB:", err));
+
 server.listen(8080, () => {
   console.log("Servidor Levantado!");
 });
@@ -41,13 +52,9 @@ SERVIDOR SOCKET CONFIGURADO
 -----------------------------
 */
 
-io.on("connection", (socket) => {
-  let products = [];
+io.on("connection", async (socket) => {
   console.log("Nuevo cliente conectado");
 
-  if (fs.existsSync("src/productos.json")) {
-    products = JSON.parse(fs.readFileSync("src/productos.json", "utf-8"));
-  }
-
+  const products = await productModel.find();
   socket.emit("firstProducts", products);
 });

@@ -1,0 +1,16 @@
+<div>
+    <div>
+        {{#each product.thumbnails}}
+        <img src="{{this}}" alt="Thumbnail" />
+        {{/each}}
+    </div>
+    <h2>{{product.title}}</h2>
+    <p>{{product.description}}</p>
+    <p>Código: {{product.code}}</p>
+    <p>Precio: ${{product.price}}</p>
+    <p>Estado: {{#if product.status}}Disponible{{else}}No disponible{{/if}}</p>
+    <p>Stock: {{product.stock}}</p>
+    <p>Categoría: {{product.category}}</p>
+</div>
+
+<button onclick="button('{{productId}}')">Agregar al carrito</button>

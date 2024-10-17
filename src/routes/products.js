@@ -1,13 +1,13 @@
 import { Router } from "express";
-import fs from "fs";
-import { uploader, verification } from "../utils.js";
+import { uploader, } from "../utils.js";
+import { productModel } from "../models/products.js";
 
 const router = Router();
 
 /*
 MENSAJE IMPORTANTE.
 
-- Se puede hacer el posteo desde el body con un un 'form-data' o un 'raw'.
+- Se puede hacer el posteo desde el body con un 'form-data' o un 'raw'.
 En caso de hacerlo con 'form-data' descarga la imagen brindada en el campo 'thumbnail', y la agrega en la carpeta 'public/img'. 
 
 */
@@ -18,19 +18,43 @@ TREAR PRODUCTO
 -------------------------------
 */
 
-router.get("/", (req, res) => {
-  const array = [];
-  const queryLimit = req.query.limit;
-  const productos = JSON.parse(fs.readFileSync("src/productos.json", "utf-8"));
+router.get("/", async (req, res) => {
+  const { page = 1, limit = 10, sort = 'createAt', order, category, stock } = req.query;
+  const sortOrder = order === 'desc' ? -1 :
+    (order === 'asc' ? 1 : undefined);
+  const sortOption = sortOrder ? { [sort]: sortOrder } : {};
+  const filter = {};
 
-  if (queryLimit && queryLimit < productos.length) {
-    for (let i = 0; i < queryLimit; i++) {
-      array.push(productos[i]);
-    }
-    return res.send(array);
+  if (category) {
+    filter.category = category
+  }
+  if (stock) {
+    filter.stock = stock
   }
 
-  res.send(productos);
+  const paginateOptions = {
+    limit,
+    page,
+    sort: sortOption,
+  }
+
+  try {
+    const { docs, totalPages, hasPrevPage, hasNextPage, prevPage, nextPage } = await productModel.paginate(filter, paginateOptions)
+
+    console.log(docs);
+
+
+    const prevLink = hasPrevPage ? `${req.protocol}://${req.get('host')}/api/products?limit=${limit}&page=${prevPage}` : null;
+
+    const nextLink = hasNextPage ? `${req.protocol}://${req.get('host')}/api/products?limit=${limit}&page=${nextPage}` : null;
+
+    res.send({ result: "success", payload: docs, totalPages, prevPage, nextPage, page, hasPrevPage, hasNextPage, prevLink, nextLink })
+
+  } catch (error) {
+    res.send("Cannot get users with mongoose:" + error);
+
+  }
+
 });
 
 /*
@@ -59,7 +83,8 @@ CREAR PRODUCTO
 -------------------------------
 */
 
-router.post("/", uploader.array("thumbnails"), verification, (req, res) => {
+router.post("/", uploader.array("thumbnails"), async (req, res) => {
+
   const io = req.io;
 
   if (req.files) {
@@ -78,38 +103,34 @@ router.post("/", uploader.array("thumbnails"), verification, (req, res) => {
     }
   }
 
-  const products = req.body;
+  try {
+    const products = req.body
+    const { title, description, code, price, status, stock, category, thumbnails } = req.body;
 
-  io.emit("products", products);
+    const result = await productModel.create({
+      title,
+      description,
+      code,
+      price,
+      status,
+      stock,
+      category,
+      thumbnails,
+    })
+    console.log(products);
 
-  if (!fs.existsSync("src/productos.json")) {
-    fs.writeFileSync(
-      "src/productos.json",
-      JSON.stringify([{ ...products, id: 1 }])
-    );
-    return res.status(201).send("Producto creado con exito");
+    io.emit("products", products);
+    res.send({ status: "success", payload: result })
+
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        status: 'error',
+        message: error.message
+      });
+    }
   }
 
-  const productsFile = JSON.parse(
-    fs.readFileSync("src/productos.json", "utf-8")
-  );
-
-  if (productsFile.length === 0) {
-    fs.writeFileSync(
-      "src/productos.json",
-      JSON.stringify([{ ...products, id: 1 }])
-    );
-    return res.status(201).send("Producto creado con exito");
-  }
-
-  productsFile.push({
-    ...products,
-    id: productsFile[productsFile.length - 1].id + 1,
-  });
-
-  fs.writeFileSync("src/productos.json", JSON.stringify(productsFile));
-
-  res.status(201).send("Producto creado con exito!");
 });
 
 /*
@@ -118,14 +139,11 @@ ACTUALIZAR PRODUCTO
 -------------------------------
 */
 
-router.put("/:pid", uploader.array("thumbnails"), verification, (req, res) => {
+router.put("/:pid", uploader.array("thumbnails"), async(req, res) => {
   const io = req.io;
   const newProduct = req.body;
   const idProduct = req.params.pid;
 
-  if (!fs.existsSync("src/productos.json")) {
-    return res.status(400).send("No existen productos para actualizar");
-  }
 
   let thumbnailsArray = [];
 
@@ -144,23 +162,12 @@ router.put("/:pid", uploader.array("thumbnails"), verification, (req, res) => {
     thumbnailsArray = thumbnails;
   }
 
-  const products = req.body;
+  const product = await productModel.findById(idProduct);
 
-  products.thumbnails = thumbnailsArray;
+  product.thumbnails = thumbnailsArray;
 
-  const productsFile = JSON.parse(
-    fs.readFileSync("src/productos.json", "utf-8")
-  );
-
-  const product = productsFile.findIndex((e) => e.id == idProduct);
-
-  if (product === -1) {
-    return res.status(400).send("Producto inexistente");
-  }
-
-  productsFile[product] = { ...newProduct, id: productsFile[product].id };
-  fs.writeFileSync("src/productos.json", JSON.stringify(productsFile));
-  res.status(201).send(productsFile);
+    await newProduct.save();
+    res.status(201).send(productsFile);
 
   io.emit("newProducts", productsFile);
 });
@@ -171,26 +178,18 @@ BORRAR PRODUCTO
 -------------------------------
 */
 
-router.delete("/:pid", (req, res) => {
+router.delete("/:pid", async(req, res) => {
   const productId = req.params.pid;
-  if (!fs.existsSync("src/productos.json")) {
-    return res.status(400).send("No existen productos para eliminar");
-  }
-  const productsFile = JSON.parse(
-    fs.readFileSync("src/productos.json", "utf-8")
-  );
 
-  const products = productsFile.filter((e) => e.id != productId);
-  if (products.length === productsFile.length) {
+  const product = await productModel.findById(productId);
+  const deleteProduct = await productModel.deleteOne({_id: productId});
+
+  if (!product) {
     return res.status(400).send("No existe ese producto para eliminar");
   }
 
-  const io = req.io;
 
-  io.emit("products", products);
-
-  fs.writeFileSync("src/productos.json", JSON.stringify(products));
-
-  return res.status(200).json({ success: true, message: "Producto eliminado con éxito", products });});
+  return res.status(200).json({ success: true, message: "Producto eliminado con éxito", deleteProduct });
+});
 
 export default router;

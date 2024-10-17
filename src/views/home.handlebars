@@ -1,8 +1,42 @@
+<select id="sortOrder">
+    <option value="asc">Ascendente</option>
+    <option value="desc">Descendente</option>
+</select>
 
-{{#each products}}<br>{{this.title}} </br>{{this.description}}</br>{{this.code}}</br>{{this.price}}</br>{{this.status}}</br>{{this.stock}}</br>{{this.category}}</br>{{#each this.thumbnails}}<img src={{this}}>{{/each}}
+<input type="search" id="query" placeholder="Categoria" name="category">
+<input type="search" id="query2" placeholder="Stock" name="stock">
+<button onclick="search()">Buscar</button>
+
+{{#each docs}}
+<div>
+    <a href="/products/{{this.id}}" style="width: 200px; display:inline-block">
+        <div>
+            {{#each this.thumbnails}}
+            <img src="{{this}}" alt="Thumbnail" />
+            {{/each}}
+        </div>
+        <h2>{{this.title}}</h2>
+        <p>{{this.description}}</p>
+        <p>Código: {{this.code}}</p>
+        <p>Precio: ${{this.price}}</p>
+        <p>Estado: {{#if this.status}}Disponible{{else}}No disponible{{/if}}</p>
+        <p>Stock: {{this.stock}}</p>
+        <p>Categoría: {{this.category}}</p>
+    </a>
+</div>
+<br />
 {{/each}}
 
+{{#if hasPrevPage}}
+<a href="/?page={{prevPage}}">
+    <button>Página Anterior</button>
+</a>
+{{/if}}
+
+{{#if hasNextPage}}
+<a href="/?page={{nextPage}}">
+    <button>Siguiente Página</button>
+</a>
+{{/if}}
 
 <script src="/socket.io/socket.io.js"></script>
-
-

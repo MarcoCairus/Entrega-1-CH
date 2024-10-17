@@ -1,0 +1,36 @@
+<div>
+    <h1>Tu Carrito de Compras</h1>
+
+    {{#if cart.products.length}}
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each cart.products}}
+            <tr>
+                <td>
+                    <img src="{{this.product.thumbnails.[0]}}" alt="{{this.product.title}}" width="50" />
+                    {{this.product.title}}
+                </td>
+                <td>{{this.quantity}}</td>
+                <td>${{this.product.price}}</td>
+                <td>${{multiply this.quantity this.product.price}}</td>
+                <td>
+                    <button onclick="removeFromCart('{{this.product._id}}')">Eliminar</button>
+                </td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+    <span><strong>Total:{{total}}</strong></span>
+
+    {{else}}
+    <p>Tu carrito está vacío.</p>
+    {{/if}}
+</div>
